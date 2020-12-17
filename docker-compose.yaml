@@ -1,0 +1,87 @@
+version: '3'
+
+services:
+  master:
+    container_name: "${COMPOSE_PROJECT_NAME:-citus}_master"
+    image: 'citusdata/citus:9.5.1'
+    ports: [ "${MASTER_EXTERNAL_PORT:-5432}:5432" ]
+    labels: [ 'com.citusdata.role=Master' ]
+    environment: &AUTH
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      PGUSER: "${POSTGRES_USER:-postgres}"
+      PGPASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_HOST_AUTH_METHOD: "${POSTGRES_HOST_AUTH_METHOD:-trust}"
+    logging:
+      driver: none
+
+  worker:
+    image: 'citusdata/citus:9.5.1'
+    labels: [ 'com.citusdata.role=Worker' ]
+    depends_on: [ manager ]
+    environment: *AUTH
+    command: "/wait-for-manager.sh"
+    volumes:
+      - healthcheck-volume:/healthcheck
+    logging:
+      driver: none
+
+  manager:
+    container_name: "${COMPOSE_PROJECT_NAME:-citus}_manager"
+    image: 'citusdata/membership-manager:0.3.0'
+    volumes:
+      - "${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock"
+      - healthcheck-volume:/healthcheck
+    depends_on: [ master ]
+    environment: *AUTH
+    logging:
+      driver: none
+
+  set_up:
+    depends_on: [ master ]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - DB_HOST=master
+      - DATA_DIR=/fake-data
+      - ENABLE_CITUS=true
+    volumes:
+      - ./:/fake-data
+    command: [ "/app/utils/wait-for-it.sh", "master:5432", "--",
+               "python", "-m", "app.set_up" ]
+
+  players_api:
+    depends_on: [ set_up ]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - DB_HOST=master
+    command: [ "/app/utils/wait-for-it.sh", "set_up:11111", "-t", "600",
+               "--",
+               "uvicorn",
+               "--port", "8001",
+               "--host", "0.0.0.0",
+               "app.players_api:app" ]
+
+  publisher_api:
+    depends_on: [ set_up ]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - DB_HOST=master
+    command: [ "/app/utils/wait-for-it.sh", "set_up:11111", "-t", "600",
+               "--",
+               "uvicorn",
+               "--port", "8002",
+               "--host", "0.0.0.0",
+               "app.publisher_api:app" ]
+volumes:
+  healthcheck-volume:
+  fake-data-volume:
