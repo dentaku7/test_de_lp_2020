@@ -32,6 +32,17 @@ FastAPI + SQLAlchemy + asyncpg + Citus database.
 
 FastAPI is an asynchronous framework built atop of asyncio library, and expected to have high-performance out of the box.
 
+### Authorization
+The REST API has authentication mechanism: OAuth 2.0 with HTTP header `Authorization: Bearer`.
+
+#### Login urls:
+
+`players`:
+    POST /players/token (form data: [username, password])
+
+`publisher, studio`:
+    POST /auth/login (form data: [username, password])
+
 The REST API is divided into distinct pieces - `players` and `publisher, studio`.
 They are running in separate containers and can be scaled up by employing load-balancing service (nginx, HAProxy, etc.)
 
