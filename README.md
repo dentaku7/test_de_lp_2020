@@ -56,6 +56,8 @@ Also, they will be dumped into files `players.csv`, `users.csv` in your current 
 
 ### TO-DO
 
+* Tests
+* More tests
 * Research for using two databases at the same time (single node and sharded for different parts of the system) 
 * Better support for switching between Postgres and Citus for development
 * Refactor API routers
